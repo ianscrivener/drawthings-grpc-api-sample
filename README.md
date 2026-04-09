@@ -32,6 +32,13 @@ uv run python generate.py
 uv run python generate.py --prompt "a cat" --steps 20 --seed 42
 ```
 
+### View Available Models
+
+```
+uv run model_list.py
+```
+
+
 ## Options
 
 ```
