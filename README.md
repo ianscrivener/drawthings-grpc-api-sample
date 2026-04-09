@@ -32,13 +32,6 @@ uv run python generate.py
 uv run python generate.py --prompt "a cat" --steps 20 --seed 42
 ```
 
-### View Available Models
-
-```
-uv run model_list.py
-```
-
-
 ## Options
 
 ```
@@ -62,6 +55,14 @@ Images are saved to the `img/` directory with timestamp filenames:
 
 
 ---
-### Sources
+## View Available Models
+
+```
+uv run model_list.py
+```
+
+
+---
+## Sources
 - [**draw-things-comfyui**](https://github.com/drawthingsai/draw-things-comfyui) - Official Draw Things extension for ComfyUI (TypeScript frontend, Python backend)
 - [**draw-things-community**](https://github.com/drawthingsai/draw-things-community) - Community repository with Swift diffusion model implementations and self-hosted gRPC server
