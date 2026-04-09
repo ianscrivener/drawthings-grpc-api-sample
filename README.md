@@ -7,6 +7,10 @@ See Also: [**DrawThings gRPC Protocol**](DrawThings_gRPC_Protocol.md)
 ## Setup
 
 ```bash
+# Install uv if you don't have it already 
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Set up the UV Python environment 
 uv sync
 ```
 
