@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Simple Draw Things gRPC Image Generation Example
 
@@ -21,7 +20,7 @@ import numpy as np
 from PIL import Image
 
 # Add path to draw-things-comfyui generated code
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../draw-things-comfyui/src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../draw-things-comfyui/src"))
 
 from generated import config_generated, imageService_pb2, imageService_pb2_grpc
 
@@ -101,7 +100,7 @@ def generate_image(
     seed: int = -1,
     steps: int = 20,
     cfg: float = 7.0,
-    use_tls: bool = False,
+    use_tls: bool = True,
 ):
     """
     Generate an image via Draw Things gRPC API.

@@ -9,13 +9,13 @@ Usage:
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../draw-things-comfyui/src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../draw-things-comfyui/src"))
 
 import grpc
 import json
 import base64
 from google.protobuf.json_format import MessageToJson
-from generated import imageService_pb2, imageService_pb2_grpc
+from generate import imageService_pb2, imageService_pb2_grpc
 
 
 def list_models(server: str = "localhost", port: int = 7859, use_tls: bool = False):
