@@ -254,7 +254,3 @@ gRPCServerCLI <models_path> [options]
   --modelBrowser           # Enable model browsing via Echo
   --join                   # Join proxy server cluster
 ```
-
-## Client Implementation Reference
-
-See `draw-things-comfyui/src/draw_things.py` for Python async gRPC client implementation using `grpc.aio`.
