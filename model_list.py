@@ -47,21 +47,41 @@ def list_models(server: str = "localhost", port: int = 7859, use_tls: bool = Fal
     print(f"Server ID: {response.serverIdentifier}")
     print(f"Shared Secret Missing: {response.sharedSecretMissing}")
 
-    files = list(response.files)
-    print(f"\n=== Available Models ({len(files)}) ===")
-    for f in sorted(files):
-        print(f"  {f}")
+    # Parse override for typed model lists
+    all_items = []  # (type, name, info)
 
-    if response.override:
-        override = dict(response.override)
-        if override:
-            print(f"\n=== Model Metadata ===")
-            for key, b64_value in sorted(override.items()):
+    if response.HasField("override") and response.override:
+        override_json = json.loads(MessageToJson(response.override))
+        for key, value in override_json.items():
+            if isinstance(value, str) and value:
                 try:
-                    value = json.loads(str(base64.b64decode(b64_value), "utf8"))
-                    print(f"  {key}: {value}")
+                    items = json.loads(str(base64.b64decode(value), "utf8"))
+                    if isinstance(items, list):
+                        for item in items:
+                            if isinstance(item, dict):
+                                name = item.get("name", "")
+                                file = item.get("file", "")
+                                if name and file and name != file:
+                                    display = f"{name} ({file})"
+                                else:
+                                    display = name or file or "unknown"
+                                all_items.append((key, display, item))
+                            else:
+                                all_items.append((key, str(item), None))
                 except Exception:
-                    print(f"  {key}: <decode error>")
+                    pass
+
+    # Sort by type, then by name
+    all_items.sort(key=lambda x: (x[0].lower(), x[1].lower()))
+
+    print(f"\n=== Available Models ({len(all_items)}) ===")
+
+    current_type = None
+    for item_type, name, info in all_items:
+        if item_type != current_type:
+            print(f"\n--- {item_type.upper()} ---")
+            current_type = item_type
+        print(f"  {name}")
 
     if response.HasField("thresholds"):
         t = response.thresholds

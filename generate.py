@@ -11,7 +11,6 @@ Requirements:
 """
 
 import os
-import struct
 import sys
 import time
 from datetime import datetime
@@ -25,12 +24,6 @@ from PIL import Image
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../draw-things-comfyui/src"))
 
 from generated import config_generated, imageService_pb2, imageService_pb2_grpc
-
-# Constants from image_handlers.py
-CCV_TENSOR_CPU_MEMORY = 0x1
-CCV_TENSOR_FORMAT_NHWC = 0x02
-CCV_16F = 0x20000
-CCV_8U = 0x01000
 
 
 def clamp(value):
@@ -55,7 +48,7 @@ def build_generation_config(
     config.model = model
     config.startWidth = width // 64
     config.startHeight = height // 64
-    config.seed = seed
+    config.seed = max(0, seed) if seed >= 0 else 0  # Ensure non-negative
     config.steps = steps
     config.guidanceScale = cfg
     config.strength = strength
@@ -69,7 +62,10 @@ def build_generation_config(
 def decode_response_image(response_image: bytes) -> Image.Image:
     """Decode a Draw Things image response to PIL Image."""
 
-    int_buffer = np.frombuffer(response_image, dtype=np.uint32, count=17)
+    if len(response_image) < 68:
+        raise ValueError(f"Image data too short: {len(response_image)} bytes (expected >= 68)")
+
+    int_buffer = np.frombuffer(response_image[:68], dtype=np.uint32, count=17)
     height, width, channels = int_buffer[6:9]
     is_compressed = int_buffer[0] == 1012247
 
@@ -80,7 +76,7 @@ def decode_response_image(response_image: bytes) -> Image.Image:
     else:
         data = response_image[68:]
 
-    fp16_data = np.frombuffer(data, dtype=np.float16, count=width * height * channels // 2)
+    fp16_data = np.frombuffer(data, dtype=np.float16, count=width * height * channels)
     fp16_data = np.clip((fp16_data + 1) * 127, 0, 255).astype(np.uint8)
 
     if channels == 4:
@@ -97,12 +93,12 @@ def decode_response_image(response_image: bytes) -> Image.Image:
 def generate_image(
     server: str = "localhost",
     port: int = 7859,
-    model: str = "sd_xl_base_1.0.safetensors",
-    prompt: str = "a beautiful landscape",
+    model: str = "realism_sdxl_by_stable_yogi_f16.ckpt",
+    prompt: str = "a gorgeous blonde woman riding a unicorn in a yellow bikini",
     negative_prompt: str = "blurry, low quality",
     width: int = 512,
     height: int = 512,
-    seed: int = None,
+    seed: int = -1,
     steps: int = 20,
     cfg: float = 7.0,
     use_tls: bool = False,
@@ -124,7 +120,7 @@ def generate_image(
         use_tls: Whether to use TLS
     """
 
-    if seed is None:
+    if seed is None or seed < 0:
         seed = int(time.time() * 1000) % 4294967295
 
     # Build FlatBuffers configuration
@@ -146,21 +142,21 @@ def generate_image(
     ]
 
     if use_tls:
-        # For TLS, you would need credentials
-        channel = grpc.secure_channel(f"{server}:{port}", grpc.ssl_channel_credentials(), options=options)
+        channel = grpc.secure_channel(
+            f"{server}:{port}", grpc.ssl_channel_credentials(), options=options
+        )
     else:
         channel = grpc.insecure_channel(f"{server}:{port}", options=options)
 
     stub = imageService_pb2_grpc.ImageGenerationServiceStub(channel)
 
-    # Create request
     request = imageService_pb2.ImageGenerationRequest(
         prompt=prompt,
         negativePrompt=negative_prompt,
         configuration=config_fbs,
         user="grpc-example",
         device="LAPTOP",
-        chunked=True,  # Accept chunked responses for large images
+        chunked=True,
     )
 
     print(f"[gRPC] Sending GenerateImage request...")
@@ -174,31 +170,27 @@ def generate_image(
     response_stream = stub.GenerateImage(request)
 
     response_images = []
-    last_signpost = None
 
     while True:
-        response = response_stream.next()
-        if response is None:
+        try:
+            response = response_stream.next()
+        except StopIteration:
             break
 
-        # Check for signpost (progress)
+        # Print progress
         signpost = response.currentSignpost
         if signpost:
-            if signpost.HasField("textEncoded"):
-                print(f"[gRPC] Status: text encoded")
-            elif signpost.HasField("sampling"):
+            if signpost.HasField("sampling"):
                 print(f"[gRPC] Progress: step {signpost.sampling.step}/{steps}")
             elif signpost.HasField("imageDecoded"):
                 print(f"[gRPC] Status: image decoded")
-            elif signpost.HasField("imageEncoded"):
-                print(f"[gRPC] Status: final image encoded")
 
         # Collect generated images
         if response.generatedImages:
             response_images.extend(response.generatedImages)
 
-        # Check for chunk state
-        if response.chunkState == 1:  # LAST_CHUNK
+        # LAST_CHUNK = 1
+        if response.chunkState == 1:
             break
 
     channel.close()
@@ -227,12 +219,12 @@ def main():
     parser = argparse.ArgumentParser(description="Generate image via Draw Things gRPC")
     parser.add_argument("--server", default="localhost", help="gRPC server address")
     parser.add_argument("--port", type=int, default=7859, help="gRPC server port")
-    parser.add_argument("--model", default="sd_xl_base_1.0.safetensors", help="Model filename")
-    parser.add_argument("--prompt", default="a beautiful landscape", help="Text prompt")
+    parser.add_argument("--model", default="realism_sdxl_by_stable_yogi_f16.ckpt", help="Model filename (.ckpt)")
+    parser.add_argument("--prompt", default="a gorgeous blonde woman riding a unicorn in a yellow bikini", help="Text prompt")
     parser.add_argument("--negative", default="blurry, low quality", help="Negative prompt")
     parser.add_argument("--width", type=int, default=512, help="Image width")
     parser.add_argument("--height", type=int, default=512, help="Image height")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument("--seed", type=int, default=-1, help="Random seed")
     parser.add_argument("--steps", type=int, default=20, help="Inference steps")
     parser.add_argument("--cfg", type=float, default=7.0, help="CFG scale")
     parser.add_argument("--tls", action="store_true", help="Use TLS")
