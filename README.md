@@ -23,7 +23,7 @@ Make sure the DrawThings gRPC server is running first:
 
 1. ✅ Server Online
 1. ✅ gRPC (not HTTP)
-1. ✅ Transport Layer Security
+1. ❌ Transport Layer Security
 1. ✅ Enable Model Browsing
 
 

@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image
 
 # Add path to draw-things-comfyui generated code
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../draw-things-comfyui/src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "third_party/draw-things-comfyui"))
 
 from generated import config_generated, imageService_pb2, imageService_pb2_grpc
 

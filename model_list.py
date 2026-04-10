@@ -9,7 +9,7 @@ Usage:
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../draw-things-comfyui/src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "third_party/draw-things-comfyui"))
 
 import grpc
 import json
