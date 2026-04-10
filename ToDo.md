@@ -14,6 +14,3 @@
     - IPAdapter (SDXL)
     - IPAdapter Face (SDXL)
 
-### Mrthod Add-Ons
- - Face Fix
- - Upscaler
