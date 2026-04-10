@@ -13,3 +13,7 @@ wheels/
 # CLIO (managed automatically)
 .clio/*
 !.clio/instructions.md
+
+z_scratch.txt
+img/*
+img_src/*
