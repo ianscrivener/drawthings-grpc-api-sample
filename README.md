@@ -30,9 +30,12 @@ Make sure the DrawThings gRPC server is running first:
 Then generate an image:
 
 ```bash
-uv run python generate.py
+uv run drawthings-grpc-generate
 
 # or vary the prompts
+uv run drawthings-grpc-generate --prompt "a cat" --steps 20 --seed 42
+
+# compatibility wrapper still works
 uv run python generate.py --prompt "a cat" --steps 20 --seed 42
 ```
 
@@ -62,7 +65,10 @@ Images are saved to the `img/` directory with timestamp filenames:
 ## View Available Models
 
 ```
-uv run model_list.py
+uv run drawthings-grpc-model-list
+
+# compatibility wrapper still works
+uv run python model_list.py
 ```
 
 
