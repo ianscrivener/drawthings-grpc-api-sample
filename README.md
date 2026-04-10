@@ -1,5 +1,11 @@
 # DrawThings gRPC Image Generation Example
 
+**Note:** Some advanced CLI options (such as upscaling) are only available when running the main CLI directly:
+
+	uv run python src/drawthings_grpc_sample/generate.py [args]
+
+The root-level wrapper (generate.py) does not support new options like --upscale, --upscale-model, or --upscale-factor. Always use the direct path for these features.
+
 Simple Python example demonstrating how to call the DrawThings gRPC API.
 
 See Also: [**DrawThings gRPC Protocol**](DrawThings_gRPC_Protocol.md)
@@ -16,6 +22,7 @@ uv sync
 
 Dependencies are already configured in `pyproject.toml`.
 
+
 ## Run
 
 Make sure the DrawThings gRPC server is running first:
@@ -27,30 +34,35 @@ Make sure the DrawThings gRPC server is running first:
 1. ✅ Know whether server TLS is ON or OFF
 
 
+
 Then generate an image (server TLS OFF):
 
 ```bash
-uv run drawthings-grpc-generate
+# Full CLI (all options, including upscaling):
+uv run python src/drawthings_grpc_sample/generate.py t2i --prompt "a cat" --steps 20 --seed 42 --upscale
 
-# or vary the prompts
-uv run drawthings-grpc-generate --prompt "a cat" --steps 20 --seed 42
-
-# compatibility wrapper still works
+# Compatibility wrapper (basic options only):
 uv run python generate.py --prompt "a cat" --steps 20 --seed 42
 ```
+
 
 If server TLS is ON, add `--tls`:
 
 ```bash
-uv run drawthings-grpc-generate --tls
+# Full CLI (all options, including upscaling):
+uv run python src/drawthings_grpc_sample/generate.py t2i --tls --upscale
 
-# compatibility wrapper still works
+# Compatibility wrapper (basic options only):
 uv run python generate.py --tls
 ```
 
-## Options
+
+## Options (full CLI)
 
 ```
+--upscale                Enable upscaling (flag or --upscale true)
+--upscale-model <file>   Upscale model filename (.ckpt)
+--upscale-factor <int>   Upscale factor (e.g., 2)
 --server localhost   gRPC server address
 --port 7859          gRPC server port
 --model <file>       Model filename on server
