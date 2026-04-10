@@ -24,6 +24,7 @@ from drawthings_grpc_sample.generated import (
     imageService_pb2,
     imageService_pb2_grpc,
 )
+from drawthings_grpc_sample.tls import create_channel
 
 
 def clamp(value):
@@ -102,6 +103,7 @@ def generate_image(
     steps: int = 20,
     cfg: float = 7.0,
     use_tls: bool = True,
+    tls_ca_file: str | None = None,
 ):
     """
     Generate an image via Draw Things gRPC API.
@@ -118,6 +120,7 @@ def generate_image(
         steps: Number of inference steps
         cfg: Guidance scale
         use_tls: Whether to use TLS
+        tls_ca_file: Optional path to PEM CA certificate for TLS verification
     """
 
     if seed is None or seed < 0:
@@ -135,18 +138,7 @@ def generate_image(
         cfg=cfg,
     )
 
-    # Create gRPC channel
-    options = [
-        ["grpc.max_send_message_length", -1],
-        ["grpc.max_receive_message_length", -1],
-    ]
-
-    if use_tls:
-        channel = grpc.secure_channel(
-            f"{server}:{port}", grpc.ssl_channel_credentials(), options=options
-        )
-    else:
-        channel = grpc.insecure_channel(f"{server}:{port}", options=options)
+    channel = create_channel(server, port, use_tls, ca_cert_file=tls_ca_file)
 
     stub = imageService_pb2_grpc.ImageGenerationServiceStub(channel)
 
@@ -228,6 +220,11 @@ def main():
     parser.add_argument("--steps", type=int, default=20, help="Inference steps")
     parser.add_argument("--cfg", type=float, default=7.0, help="CFG scale")
     parser.add_argument("--tls", action="store_true", help="Use TLS")
+    parser.add_argument(
+        "--tls-ca-file",
+        default=None,
+        help="Path to PEM CA certificate used to verify TLS server certificate",
+    )
 
     args = parser.parse_args()
 
@@ -244,6 +241,7 @@ def main():
             steps=args.steps,
             cfg=args.cfg,
             use_tls=args.tls,
+            tls_ca_file=args.tls_ca_file,
         )
     except grpc.RpcError as e:
         print(f"[Error] gRPC error: {e.code()}: {e.details()}")

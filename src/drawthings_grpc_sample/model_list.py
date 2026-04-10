@@ -13,22 +13,18 @@ import json
 import base64
 from google.protobuf.json_format import MessageToJson
 from drawthings_grpc_sample.generated import imageService_pb2, imageService_pb2_grpc
+from drawthings_grpc_sample.tls import create_channel
 
 
-def list_models(server: str = "localhost", port: int = 7859, use_tls: bool = False):
+def list_models(
+    server: str = "localhost",
+    port: int = 7859,
+    use_tls: bool = False,
+    tls_ca_file: str | None = None,
+):
     """Get list of available models from Draw Things gRPC server."""
 
-    options = [
-        ["grpc.max_send_message_length", -1],
-        ["grpc.max_receive_message_length", -1],
-    ]
-
-    if use_tls:
-        channel = grpc.secure_channel(
-            f"{server}:{port}", grpc.ssl_channel_credentials(), options=options
-        )
-    else:
-        channel = grpc.insecure_channel(f"{server}:{port}", options=options)
+    channel = create_channel(server, port, use_tls, ca_cert_file=tls_ca_file)
 
     stub = imageService_pb2_grpc.ImageGenerationServiceStub(channel)
 
@@ -96,11 +92,21 @@ def main():
     parser.add_argument("--server", default="localhost", help="gRPC server address")
     parser.add_argument("--port", type=int, default=7859, help="gRPC server port")
     parser.add_argument("--tls", action="store_true", help="Use TLS")
+    parser.add_argument(
+        "--tls-ca-file",
+        default=None,
+        help="Path to PEM CA certificate used to verify TLS server certificate",
+    )
 
     args = parser.parse_args()
 
     try:
-        list_models(server=args.server, port=args.port, use_tls=args.tls)
+        list_models(
+            server=args.server,
+            port=args.port,
+            use_tls=args.tls,
+            tls_ca_file=args.tls_ca_file,
+        )
     except grpc.RpcError as e:
         print(f"[Error] gRPC error: {e.code()}: {e.details()}")
         sys.exit(1)
