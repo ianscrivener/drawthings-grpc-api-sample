@@ -40,6 +40,7 @@ DEFAULT_I2I__HEIGHT = 512
 DEFAULT_I2I__STRENGTH = 0.6
 DEFAULT_UPSCALE_MODEL = "4x_ultrasharp_f16.ckpt"
 DEFAULT_UPSCALE_FACTOR = 2
+DEFAULT_FACE_RESTORE_MODEL = "RestoreFormer.pth"
 
 
 def clamp(value):
@@ -58,6 +59,7 @@ def build_generation_config(
     strength: float = 1.0,
     upscaler: str | None = None,
     upscaler_scale_factor: int = 0,
+    face_restoration: str | None = None,
     sampler: int = 0,
 ) -> bytes:
     """Build a FlatBuffers GenerationConfiguration from parameters."""
@@ -71,11 +73,15 @@ def build_generation_config(
     config.guidanceScale = cfg
     config.strength = strength
     config.sampler = sampler
+    config.batchCount = 1
+    config.batchSize = 1
 
     if upscaler:
         config.upscaler = upscaler
     if upscaler_scale_factor > 0:
         config.upscalerScaleFactor = upscaler_scale_factor
+    if face_restoration:
+        config.faceRestoration = face_restoration
 
     builder = flatbuffers.Builder(0)
     builder.Finish(config.Pack(builder))
@@ -191,6 +197,7 @@ def generate_image(
     upscale: bool = False,
     upscale_model: str = DEFAULT_UPSCALE_MODEL,
     upscale_factor: int = DEFAULT_UPSCALE_FACTOR,
+    face_restore: str | None = None,
     use_tls: bool = True,
     tls_ca_file: str | None = None,
 ):
@@ -211,6 +218,7 @@ def generate_image(
         strength=strength,
         upscaler=upscale_model if upscale else None,
         upscaler_scale_factor=upscale_factor if upscale else 0,
+        face_restoration=face_restore,
     )
 
     channel = create_channel(server, port, use_tls, ca_cert_file=tls_ca_file)
@@ -243,6 +251,8 @@ def generate_image(
     print(f"[gRPC]   Size: {width}x{height}")
     if upscale:
         print(f"[gRPC]   Upscale: {upscale_model} x{upscale_factor}")
+    if face_restore:
+        print(f"[gRPC]   Face restore: {face_restore if face_restore else '<server-default>'}")
 
     response_stream = stub.GenerateImage(request)
     response_images = []
@@ -315,6 +325,7 @@ def image_to_image(
     upscale: bool = False,
     upscale_model: str = DEFAULT_UPSCALE_MODEL,
     upscale_factor: int = DEFAULT_UPSCALE_FACTOR,
+    face_restore: str | None = None,
     use_tls: bool = True,
     tls_ca_file: str | None = None,
 ):
@@ -336,6 +347,7 @@ def image_to_image(
         upscale=upscale,
         upscale_model=upscale_model,
         upscale_factor=upscale_factor,
+        face_restore=face_restore,
         use_tls=use_tls,
         tls_ca_file=tls_ca_file,
     )
@@ -365,6 +377,7 @@ def main(argv=None):
     parser.add_argument("--upscale", nargs="?", const=True, default=False, help="Enable upscaling (use --upscale or --upscale true)")
     parser.add_argument("--upscale-model", default=DEFAULT_UPSCALE_MODEL, help="Upscale model filename (.ckpt)")
     parser.add_argument("--upscale-factor", type=int, default=DEFAULT_UPSCALE_FACTOR, help="Upscale factor (for example, 2)")
+    parser.add_argument("--face-restore", action="store_true", help=f"Enable face restoration using fixed model: {DEFAULT_FACE_RESTORE_MODEL}")
     parser.add_argument("--tls", action="store_true", help="Use TLS")
     parser.add_argument("--tls-ca-file", default=None, help="Path to PEM CA certificate used to verify TLS server certificate")
 
@@ -378,6 +391,7 @@ def main(argv=None):
     height = args.height if args.height is not None else (DEFAULT_I2I__HEIGHT if mode == "i2i" else 512)
     strength = args.strength if mode == "i2i" else 1.0
     upscale = args.upscale if isinstance(args.upscale, bool) else str(args.upscale).lower() in {"1", "true", "yes", "on"}
+    face_restore_model = DEFAULT_FACE_RESTORE_MODEL if args.face_restore else None
 
     try:
         if mode == "i2i":
@@ -397,6 +411,7 @@ def main(argv=None):
                 upscale=upscale,
                 upscale_model=args.upscale_model,
                 upscale_factor=args.upscale_factor,
+                face_restore=face_restore_model,
                 use_tls=args.tls,
                 tls_ca_file=args.tls_ca_file,
             )
@@ -415,6 +430,7 @@ def main(argv=None):
                 upscale=upscale,
                 upscale_model=args.upscale_model,
                 upscale_factor=args.upscale_factor,
+                face_restore=face_restore_model,
                 use_tls=args.tls,
                 tls_ca_file=args.tls_ca_file,
             )
