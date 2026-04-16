@@ -1,0 +1,43 @@
+grpc:
+  server: localhost
+  port: 7859
+  compression: false
+  request_chunked: true
+  tls: true
+  tls_ca_file: null
+
+
+
+
+generation:
+  t2i:
+    model: porncraft_by_stableyogi_v3.0_bf16_f16.ckpt
+    prompt: "a gorgeous blonde woman riding a unicorn in a yellow bikini"
+    negative_prompt: ""
+    width: 1024
+    height: 1024
+    seed: -1
+    steps: 18
+    cfg: 5.0
+    sampler: "UniPC"
+    upscale: false
+    # upscale_model: 4x_ultrasharp_f16.ckpt
+    # upscale_factor: 2
+    # face_restore_model: RestoreFormer.pth
+
+  i2i:
+    model: porncraft_by_stableyogi_v3.0_bf16_f16.ckpt
+    prompt: "Change the color of the apple to blue. "
+    negative_prompt: ""
+    source_image: img_src/apple.png
+    width: 1024
+    height: 1024
+    strength: 0.6
+    seed: -1
+    steps: 18
+    cfg: 5.0
+    sampler: "UniPC"
+    # upscale: false
+    # upscale_model: 4x_ultrasharp_f16.ckpt
+    # upscale_factor: 2
+    # face_restore_model: RestoreFormer.pth

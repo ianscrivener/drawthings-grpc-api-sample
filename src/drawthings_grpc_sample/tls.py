@@ -50,15 +50,17 @@ def create_channel(
     use_tls: bool,
     *,
     ca_cert_file: str | None = None,
+    use_compression: bool = False,
 ):
     options = [
         ["grpc.max_send_message_length", -1],
         ["grpc.max_receive_message_length", -1],
     ]
+    compression = grpc.Compression.Gzip if use_compression else None
 
     if use_tls:
         root_certs = _load_root_certificates(ca_cert_file)
         creds = grpc.ssl_channel_credentials(root_certificates=root_certs)
-        return grpc.secure_channel(f"{server}:{port}", creds, options=options)
+        return grpc.secure_channel(f"{server}:{port}", creds, options=options, compression=compression)
 
-    return grpc.insecure_channel(f"{server}:{port}", options=options)
+    return grpc.insecure_channel(f"{server}:{port}", options=options, compression=compression)

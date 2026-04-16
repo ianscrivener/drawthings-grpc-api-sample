@@ -26,21 +26,50 @@ from drawthings_grpc_sample.generated import (
     imageService_pb2,
     imageService_pb2_grpc,
 )
+from drawthings_grpc_sample.defaults import (
+    DEFAULT_GRPC_COMPRESSION,
+    DEFAULT_I2I_CFG,
+    DEFAULT_I2I_FACE_RESTORE_MODEL,
+    DEFAULT_I2I_HEIGHT,
+    DEFAULT_I2I_MODEL,
+    DEFAULT_I2I_NEGATIVE_PROMPT,
+    DEFAULT_I2I_PROMPT,
+    DEFAULT_I2I_SAMPLER,
+    DEFAULT_I2I_SEED,
+    DEFAULT_I2I_SOURCE_IMAGE,
+    DEFAULT_I2I_STEPS,
+    DEFAULT_I2I_STRENGTH,
+    DEFAULT_I2I_UPSCALE,
+    DEFAULT_I2I_UPSCALE_FACTOR,
+    DEFAULT_I2I_UPSCALE_MODEL,
+    DEFAULT_I2I_WIDTH,
+    DEFAULT_PORT,
+    DEFAULT_REQUEST_CHUNKED,
+    DEFAULT_SERVER,
+    DEFAULT_T2I_CFG,
+    DEFAULT_T2I_FACE_RESTORE_MODEL,
+    DEFAULT_T2I_HEIGHT,
+    DEFAULT_T2I_MODEL,
+    DEFAULT_T2I_NEGATIVE_PROMPT,
+    DEFAULT_T2I_PROMPT,
+    DEFAULT_T2I_SAMPLER,
+    DEFAULT_T2I_SEED,
+    DEFAULT_T2I_STEPS,
+    DEFAULT_T2I_UPSCALE,
+    DEFAULT_T2I_UPSCALE_FACTOR,
+    DEFAULT_T2I_UPSCALE_MODEL,
+    DEFAULT_T2I_WIDTH,
+    DEFAULT_TLS_CA_FILE,
+    DEFAULT_USE_TLS,
+)
+from drawthings_grpc_sample.model_list import get_available_model_files
+from drawthings_grpc_sample.samplers import resolve_sampler
 from drawthings_grpc_sample.tls import create_channel
 
 
 CCV_TENSOR_CPU_MEMORY = 0x1
 CCV_TENSOR_FORMAT_NHWC = 0x02
 CCV_16F = 0x20000
-
-DEFAULT_T2I_PROMPT = "a gorgeous blonde woman riding a unicorn in a yellow bikini"
-DEFAULT_I2I_PROMPT = "a 22 year old african woman a Dark cave wearing a light blue lycra bodysuit."
-DEFAULT_I2I__WIDTH = 512
-DEFAULT_I2I__HEIGHT = 512
-DEFAULT_I2I__STRENGTH = 0.6
-DEFAULT_UPSCALE_MODEL = "4x_ultrasharp_f16.ckpt"
-DEFAULT_UPSCALE_FACTOR = 2
-DEFAULT_FACE_RESTORE_MODEL = "RestoreFormer.pth"
 
 
 def clamp(value):
@@ -50,12 +79,12 @@ def clamp(value):
 def build_generation_config(
     model: str,
     prompt: str,
-    negative_prompt: str = "",
-    width: int = 512,
-    height: int = 512,
-    seed: int = -1,
-    steps: int = 20,
-    cfg: float = 7.0,
+    negative_prompt: str = DEFAULT_T2I_NEGATIVE_PROMPT,
+    width: int = DEFAULT_T2I_WIDTH,
+    height: int = DEFAULT_T2I_HEIGHT,
+    seed: int = DEFAULT_T2I_SEED,
+    steps: int = DEFAULT_T2I_STEPS,
+    cfg: float = DEFAULT_T2I_CFG,
     strength: float = 1.0,
     upscaler: str | None = None,
     upscaler_scale_factor: int = 0,
@@ -75,6 +104,12 @@ def build_generation_config(
     config.sampler = sampler
     config.batchCount = 1
     config.batchSize = 1
+    config.originalImageWidth = width
+    config.originalImageHeight = height
+    config.targetImageWidth = width
+    config.targetImageHeight = height
+    config.negativeOriginalImageWidth = max(1, width // 2)
+    config.negativeOriginalImageHeight = max(1, height // 2)
 
     if upscaler:
         config.upscaler = upscaler
@@ -182,29 +217,55 @@ def encode_request_image(source_image: str, width: int, height: int) -> bytes:
 
 
 def generate_image(
-    server: str = "localhost",
-    port: int = 7859,
-    model: str = "realism_sdxl_by_stable_yogi_f16.ckpt",
+    server: str = DEFAULT_SERVER,
+    port: int = DEFAULT_PORT,
+    model: str = DEFAULT_T2I_MODEL,
     prompt: str = DEFAULT_T2I_PROMPT,
-    negative_prompt: str = "blurry, low quality",
-    width: int = 512,
-    height: int = 512,
-    seed: int = -1,
-    steps: int = 20,
-    cfg: float = 7.0,
+    negative_prompt: str = DEFAULT_T2I_NEGATIVE_PROMPT,
+    width: int = DEFAULT_T2I_WIDTH,
+    height: int = DEFAULT_T2I_HEIGHT,
+    seed: int = DEFAULT_T2I_SEED,
+    steps: int = DEFAULT_T2I_STEPS,
+    cfg: float = DEFAULT_T2I_CFG,
     strength: float = 1.0,
     source_image: str | None = None,
-    upscale: bool = False,
-    upscale_model: str = DEFAULT_UPSCALE_MODEL,
-    upscale_factor: int = DEFAULT_UPSCALE_FACTOR,
+    upscale: bool = DEFAULT_T2I_UPSCALE,
+    upscale_model: str = DEFAULT_T2I_UPSCALE_MODEL,
+    upscale_factor: int = DEFAULT_T2I_UPSCALE_FACTOR,
     face_restore: str | None = None,
-    use_tls: bool = True,
-    tls_ca_file: str | None = None,
+    use_tls: bool = DEFAULT_USE_TLS,
+    tls_ca_file: str | None = DEFAULT_TLS_CA_FILE,
+    sampler: str | int = DEFAULT_T2I_SAMPLER,
+    chunked: bool = DEFAULT_REQUEST_CHUNKED,
+    use_compression: bool = DEFAULT_GRPC_COMPRESSION,
 ):
     """Generate an image via Draw Things gRPC API."""
 
     if seed is None or seed < 0:
         seed = int(time.time() * 1000) % 4294967295
+
+    available_models = get_available_model_files(
+        server=server,
+        port=port,
+        use_tls=use_tls,
+        tls_ca_file=tls_ca_file,
+        use_compression=use_compression,
+    )
+
+    if not available_models:
+        raise ValueError(
+            "Could not validate the requested model because the server returned no installed models."
+        )
+
+    if model not in available_models:
+        preview = ", ".join(available_models[:10])
+        suffix = " ..." if len(available_models) > 10 else ""
+        raise ValueError(
+            f"Requested model '{model}' does not exist on {server}:{port}. "
+            f"Available models ({len(available_models)}): {preview}{suffix}"
+        )
+
+    sampler_index, sampler_name = resolve_sampler(sampler)
 
     config_fbs = build_generation_config(
         model=model,
@@ -219,9 +280,16 @@ def generate_image(
         upscaler=upscale_model if upscale else None,
         upscaler_scale_factor=upscale_factor if upscale else 0,
         face_restoration=face_restore,
+        sampler=sampler_index,
     )
 
-    channel = create_channel(server, port, use_tls, ca_cert_file=tls_ca_file)
+    channel = create_channel(
+        server,
+        port,
+        use_tls,
+        ca_cert_file=tls_ca_file,
+        use_compression=use_compression,
+    )
     stub = imageService_pb2_grpc.ImageGenerationServiceStub(channel)
 
     request_kwargs = {
@@ -230,7 +298,7 @@ def generate_image(
         "configuration": config_fbs,
         "user": "grpc-example",
         "device": "LAPTOP",
-        "chunked": True,
+        "chunked": chunked,
     }
 
     if source_image:
@@ -247,8 +315,9 @@ def generate_image(
         print(f"[gRPC]   Source: {source_image}")
         print(f"[gRPC]   Strength: {strength}")
     print(f"[gRPC]   Seed: {seed}")
-    print(f"[gRPC]   Steps: {steps}, CFG: {cfg}")
+    print(f"[gRPC]   Steps: {steps}, CFG: {cfg}, Sampler: {sampler_name} ({sampler_index})")
     print(f"[gRPC]   Size: {width}x{height}")
+    print(f"[gRPC]   Chunked response: {chunked}")
     if upscale:
         print(f"[gRPC]   Upscale: {upscale_model} x{upscale_factor}")
     if face_restore:
@@ -310,24 +379,27 @@ def generate_image(
 
 
 def image_to_image(
-    server: str = "localhost",
-    port: int = 7859,
-    model: str = "realism_sdxl_by_stable_yogi_f16.ckpt",
+    server: str = DEFAULT_SERVER,
+    port: int = DEFAULT_PORT,
+    model: str = DEFAULT_I2I_MODEL,
     prompt: str = DEFAULT_I2I_PROMPT,
-    negative_prompt: str = "blurry, low quality",
-    source_image: str = "img_src/test_1.png",
-    strength: float = DEFAULT_I2I__STRENGTH,
-    width: int = DEFAULT_I2I__WIDTH,
-    height: int = DEFAULT_I2I__HEIGHT,
-    seed: int = -1,
-    steps: int = 20,
-    cfg: float = 7.0,
-    upscale: bool = False,
-    upscale_model: str = DEFAULT_UPSCALE_MODEL,
-    upscale_factor: int = DEFAULT_UPSCALE_FACTOR,
+    negative_prompt: str = DEFAULT_I2I_NEGATIVE_PROMPT,
+    source_image: str = DEFAULT_I2I_SOURCE_IMAGE,
+    strength: float = DEFAULT_I2I_STRENGTH,
+    width: int = DEFAULT_I2I_WIDTH,
+    height: int = DEFAULT_I2I_HEIGHT,
+    seed: int = DEFAULT_I2I_SEED,
+    steps: int = DEFAULT_I2I_STEPS,
+    cfg: float = DEFAULT_I2I_CFG,
+    upscale: bool = DEFAULT_I2I_UPSCALE,
+    upscale_model: str = DEFAULT_I2I_UPSCALE_MODEL,
+    upscale_factor: int = DEFAULT_I2I_UPSCALE_FACTOR,
     face_restore: str | None = None,
-    use_tls: bool = True,
-    tls_ca_file: str | None = None,
+    use_tls: bool = DEFAULT_USE_TLS,
+    tls_ca_file: str | None = DEFAULT_TLS_CA_FILE,
+    sampler: str | int = DEFAULT_I2I_SAMPLER,
+    chunked: bool = DEFAULT_REQUEST_CHUNKED,
+    use_compression: bool = DEFAULT_GRPC_COMPRESSION,
 ):
     """Generate an image from a source image (img2img)."""
 
@@ -350,6 +422,9 @@ def image_to_image(
         face_restore=face_restore,
         use_tls=use_tls,
         tls_ca_file=tls_ca_file,
+        sampler=sampler,
+        chunked=chunked,
+        use_compression=use_compression,
     )
 
 
@@ -362,77 +437,133 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Generate image via Draw Things gRPC")
     parser.add_argument("mode", nargs="?", choices=["t2i", "i2i"], default=None, help="Generation mode (positional: t2i/i2i)")
     parser.add_argument("--mode", dest="mode_flag", choices=["t2i", "i2i"], default=None, help="Generation mode")
-    parser.add_argument("--server", default="localhost", help="gRPC server address")
-    parser.add_argument("--port", type=int, default=7859, help="gRPC server port")
-    parser.add_argument("--model", default="realism_sdxl_by_stable_yogi_f16.ckpt", help="Model filename (.ckpt)")
+    parser.add_argument("--server", default=DEFAULT_SERVER, help="gRPC server address")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="gRPC server port")
+    parser.add_argument("--model", default=None, help="Model filename (.ckpt)")
     parser.add_argument("--prompt", default=None, help="Text prompt (mode-specific default used when omitted)")
-    parser.add_argument("--negative", default="blurry, low quality", help="Negative prompt")
-    parser.add_argument("--source-image", default="img_src/test_1.png", help="Input source image for i2i mode")
-    parser.add_argument("--strength", type=float, default=DEFAULT_I2I__STRENGTH, help="Denoising strength for i2i mode")
+    parser.add_argument("--negative", default=None, help="Negative prompt")
+    parser.add_argument("--source-image", default=None, help="Input source image for i2i mode")
+    parser.add_argument("--strength", type=float, default=None, help="Denoising strength for i2i mode")
     parser.add_argument("--width", type=int, default=None, help="Image width")
     parser.add_argument("--height", type=int, default=None, help="Image height")
-    parser.add_argument("--seed", type=int, default=-1, help="Random seed")
-    parser.add_argument("--steps", type=int, default=20, help="Inference steps")
-    parser.add_argument("--cfg", type=float, default=7.0, help="CFG scale")
-    parser.add_argument("--upscale", nargs="?", const=True, default=False, help="Enable upscaling (use --upscale or --upscale true)")
-    parser.add_argument("--upscale-model", default=DEFAULT_UPSCALE_MODEL, help="Upscale model filename (.ckpt)")
-    parser.add_argument("--upscale-factor", type=int, default=DEFAULT_UPSCALE_FACTOR, help="Upscale factor (for example, 2)")
-    parser.add_argument("--face-restore", action="store_true", help=f"Enable face restoration using fixed model: {DEFAULT_FACE_RESTORE_MODEL}")
-    parser.add_argument("--tls", action="store_true", help="Use TLS")
-    parser.add_argument("--tls-ca-file", default=None, help="Path to PEM CA certificate used to verify TLS server certificate")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed")
+    parser.add_argument("--steps", type=int, default=None, help="Inference steps")
+    parser.add_argument("--cfg", type=float, default=None, help="CFG scale")
+    parser.add_argument("--sampler", default=None, help="Sampler name or index")
+    parser.add_argument("--upscale", nargs="?", const=True, default=None, help="Enable upscaling (use --upscale or --upscale true)")
+    parser.add_argument("--upscale-model", default=None, help="Upscale model filename (.ckpt)")
+    parser.add_argument("--upscale-factor", type=int, default=None, help="Upscale factor (for example, 2)")
+    parser.add_argument("--face-restore", action="store_true", help="Enable face restoration using mode-specific default model")
+    parser.set_defaults(tls=DEFAULT_USE_TLS)
+    parser.set_defaults(chunked=DEFAULT_REQUEST_CHUNKED)
+    parser.add_argument("--tls", dest="tls", action="store_true", help="Use TLS (default)")
+    parser.add_argument("--no-tls", dest="tls", action="store_false", help="Disable TLS and use plaintext")
+    parser.add_argument("--chunked", dest="chunked", action="store_true", help="Request chunked image responses")
+    parser.add_argument("--no-chunked", dest="chunked", action="store_false", help="Request non-chunked image responses")
+    parser.add_argument("--tls-ca-file", default=DEFAULT_TLS_CA_FILE, help="Path to PEM CA certificate used to verify TLS server certificate")
 
     if argv is None:
         argv = sys.argv[1:]
     args = parser.parse_args(argv)
 
     mode = args.mode_flag or args.mode or "t2i"
-    prompt = args.prompt or (DEFAULT_I2I_PROMPT if mode == "i2i" else DEFAULT_T2I_PROMPT)
-    width = args.width if args.width is not None else (DEFAULT_I2I__WIDTH if mode == "i2i" else 512)
-    height = args.height if args.height is not None else (DEFAULT_I2I__HEIGHT if mode == "i2i" else 512)
-    strength = args.strength if mode == "i2i" else 1.0
-    upscale = args.upscale if isinstance(args.upscale, bool) else str(args.upscale).lower() in {"1", "true", "yes", "on"}
-    face_restore_model = DEFAULT_FACE_RESTORE_MODEL if args.face_restore else None
+
+    if mode == "i2i":
+        mode_model = DEFAULT_I2I_MODEL
+        mode_prompt = DEFAULT_I2I_PROMPT
+        mode_negative = DEFAULT_I2I_NEGATIVE_PROMPT
+        mode_width = DEFAULT_I2I_WIDTH
+        mode_height = DEFAULT_I2I_HEIGHT
+        mode_seed = DEFAULT_I2I_SEED
+        mode_steps = DEFAULT_I2I_STEPS
+        mode_cfg = DEFAULT_I2I_CFG
+        mode_sampler = DEFAULT_I2I_SAMPLER
+        mode_upscale = DEFAULT_I2I_UPSCALE
+        mode_upscale_model = DEFAULT_I2I_UPSCALE_MODEL
+        mode_upscale_factor = DEFAULT_I2I_UPSCALE_FACTOR
+        mode_face_restore = DEFAULT_I2I_FACE_RESTORE_MODEL
+        mode_source_image = DEFAULT_I2I_SOURCE_IMAGE
+        mode_strength = DEFAULT_I2I_STRENGTH
+    else:
+        mode_model = DEFAULT_T2I_MODEL
+        mode_prompt = DEFAULT_T2I_PROMPT
+        mode_negative = DEFAULT_T2I_NEGATIVE_PROMPT
+        mode_width = DEFAULT_T2I_WIDTH
+        mode_height = DEFAULT_T2I_HEIGHT
+        mode_seed = DEFAULT_T2I_SEED
+        mode_steps = DEFAULT_T2I_STEPS
+        mode_cfg = DEFAULT_T2I_CFG
+        mode_sampler = DEFAULT_T2I_SAMPLER
+        mode_upscale = DEFAULT_T2I_UPSCALE
+        mode_upscale_model = DEFAULT_T2I_UPSCALE_MODEL
+        mode_upscale_factor = DEFAULT_T2I_UPSCALE_FACTOR
+        mode_face_restore = DEFAULT_T2I_FACE_RESTORE_MODEL
+        mode_source_image = DEFAULT_I2I_SOURCE_IMAGE
+        mode_strength = 1.0
+
+    prompt = args.prompt if args.prompt is not None else mode_prompt
+    model = args.model if args.model is not None else mode_model
+    negative_prompt = args.negative if args.negative is not None else mode_negative
+    width = args.width if args.width is not None else mode_width
+    height = args.height if args.height is not None else mode_height
+    seed = args.seed if args.seed is not None else mode_seed
+    steps = args.steps if args.steps is not None else mode_steps
+    cfg = args.cfg if args.cfg is not None else mode_cfg
+    sampler = args.sampler if args.sampler is not None else mode_sampler
+    source_image = args.source_image if args.source_image is not None else mode_source_image
+    strength = args.strength if args.strength is not None else mode_strength
+    upscale_input = args.upscale if args.upscale is not None else mode_upscale
+    upscale = upscale_input if isinstance(upscale_input, bool) else str(upscale_input).lower() in {"1", "true", "yes", "on"}
+    upscale_model = args.upscale_model if args.upscale_model is not None else mode_upscale_model
+    upscale_factor = args.upscale_factor if args.upscale_factor is not None else mode_upscale_factor
+    face_restore_model = mode_face_restore if args.face_restore else None
 
     try:
         if mode == "i2i":
             image_to_image(
                 server=args.server,
                 port=args.port,
-                model=args.model,
+                model=model,
                 prompt=prompt,
-                negative_prompt=args.negative,
-                source_image=args.source_image,
+                negative_prompt=negative_prompt,
+                source_image=source_image,
                 strength=strength,
                 width=width,
                 height=height,
-                seed=args.seed,
-                steps=args.steps,
-                cfg=args.cfg,
+                seed=seed,
+                steps=steps,
+                cfg=cfg,
                 upscale=upscale,
-                upscale_model=args.upscale_model,
-                upscale_factor=args.upscale_factor,
+                upscale_model=upscale_model,
+                upscale_factor=upscale_factor,
                 face_restore=face_restore_model,
                 use_tls=args.tls,
                 tls_ca_file=args.tls_ca_file,
+                sampler=sampler,
+                chunked=args.chunked,
+                use_compression=DEFAULT_GRPC_COMPRESSION,
             )
         else:
             generate_image(
                 server=args.server,
                 port=args.port,
-                model=args.model,
+                model=model,
                 prompt=prompt,
-                negative_prompt=args.negative,
+                negative_prompt=negative_prompt,
                 width=width,
                 height=height,
-                seed=args.seed,
-                steps=args.steps,
-                cfg=args.cfg,
+                seed=seed,
+                steps=steps,
+                cfg=cfg,
                 upscale=upscale,
-                upscale_model=args.upscale_model,
-                upscale_factor=args.upscale_factor,
+                upscale_model=upscale_model,
+                upscale_factor=upscale_factor,
                 face_restore=face_restore_model,
                 use_tls=args.tls,
                 tls_ca_file=args.tls_ca_file,
+                sampler=sampler,
+                chunked=args.chunked,
+                use_compression=DEFAULT_GRPC_COMPRESSION,
             )
     except grpc.RpcError as e:
         print(f"[Error] gRPC error: {e.code()}: {e.details()}")

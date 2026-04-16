@@ -22,6 +22,25 @@ uv sync
 
 Dependencies are already configured in `pyproject.toml`.
 
+## defaults.yaml
+
+Runtime defaults are centralized in `defaults.yaml` at the repository root.
+
+- `grpc`: `server`, `port`, `compression`, `request_chunked`, `tls`, `tls_ca_file`
+- `generation.t2i`: t2i-specific defaults
+- `generation.i2i`: i2i-specific defaults
+
+Set `sampler` as a sampler name string in YAML (for example, `"UniPC"`), not just an index.
+
+Set `grpc.request_chunked` to control the request flag that appears in server logs as "should send in chunks?".
+
+Both CLIs load this file automatically:
+
+- `uv run python generate.py`
+- `uv run python model_list.py`
+
+You can also point to a different defaults file via `DRAWTHINGS_DEFAULTS_FILE=/path/to/defaults.yaml`.
+
 
 ## Run
 
@@ -35,7 +54,7 @@ Make sure the DrawThings gRPC server is running first:
 
 
 
-Then generate an image (server TLS OFF):
+Then generate an image (TLS ON by default):
 
 ```bash
 # Full CLI (all options, including upscaling):
@@ -46,14 +65,14 @@ uv run python generate.py --prompt "a cat" --steps 20 --seed 42
 ```
 
 
-If server TLS is ON, add `--tls`:
+If server TLS is OFF, disable TLS explicitly with `--no-tls`:
 
 ```bash
 # Full CLI (all options, including upscaling):
-uv run python src/drawthings_grpc_sample/generate.py t2i --tls --upscale
+uv run python src/drawthings_grpc_sample/generate.py t2i --no-tls --upscale
 
 # Compatibility wrapper (basic options only):
-uv run python generate.py --tls
+uv run python generate.py --no-tls
 ```
 
 
@@ -73,15 +92,19 @@ uv run python generate.py --tls
 --seed <int>         Random seed
 --steps 20           Inference steps
 --cfg 7.0            CFG scale
---tls                Use TLS (requires server to have TLS enabled)
+--sampler <value>    Sampler name or index
+--chunked            Request chunked image responses
+--no-chunked         Request non-chunked image responses
+--tls                Use TLS (default)
+--no-tls             Disable TLS and use plaintext
 --tls-ca-file <path> Path to PEM CA certificate used to verify TLS server certificate
 ```
 
 ## TLS And Certificate Verification
 
 - The client now includes the Draw Things root CA used by the server, so standard Draw Things TLS works without extra setup.
-- If server TLS is ON, use `--tls`.
-- If server TLS is OFF, do not use `--tls`.
+- TLS is ON by default.
+- If server TLS is OFF, use `--no-tls`.
 - If your server uses a different/private CA, pass `--tls-ca-file /path/to/ca.pem`.
 
 If you see `CERTIFICATE_VERIFY_FAILED`, the client does not trust the presented certificate chain. Use `--tls-ca-file` with the correct CA PEM.
@@ -91,11 +114,11 @@ If you see `CERTIFICATE_VERIFY_FAILED`, the client does not trust the presented 
 To verify all four commands pass, run them in two phases:
 
 1. With server TLS ON:
-	- `python model_list.py --tls`
-	- `python generate.py --tls`
-2. With server TLS OFF:
 	- `python model_list.py`
 	- `python generate.py`
+2. With server TLS OFF:
+	- `python model_list.py --no-tls`
+	- `python generate.py --no-tls`
 
 ## Output
 
@@ -112,10 +135,12 @@ uv run drawthings-grpc-model-list
 # compatibility wrapper still works
 uv run python model_list.py
 
-# TLS mode
-uv run drawthings-grpc-model-list --tls
-uv run python model_list.py --tls
+# plaintext mode
+uv run drawthings-grpc-model-list --no-tls
+uv run python model_list.py --no-tls
 ```
+
+The model list output also includes available samplers.
 
 
 ---
